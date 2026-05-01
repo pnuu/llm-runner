@@ -133,7 +133,19 @@ def interactive_chat_repl(config=None):
         print(f"Error: {e}")
         return
     
-    print(f"Connected to Ollama. Using model: {chat.model}")
+    url = config.get("ollama_url", "http://localhost:11434")
+    
+    # Show available models if default isn't found
+    from llm_runner.llm import get_available_models
+    available = get_available_models(url)
+    
+    print(f"Connected to Ollama at {url}")
+    if available:
+        print(f"Available models: {', '.join(available)}")
+    print(f"Using model: {chat.model}")
+    if chat.model not in available and available:
+        print(f"⚠️  Warning: '{chat.model}' not found in available models!")
+        print(f"   Try: llm-runner --model {available[0]}")
     print("Type '/quit' to exit, '/clear' to clear history")
     print()
     

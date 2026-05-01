@@ -78,3 +78,41 @@ def test_check_ollama_connection_with_timeout():
         result = check_ollama_connection("http://localhost:11434", timeout=2)
         
         assert result is False
+
+
+def test_ollama_client_handles_error_response():
+    """Test that client handles error responses from API"""
+    client = OllamaClient(url="http://localhost:11434")
+    
+    with patch("requests.post") as mock_post:
+        # Simulate API error response
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "error": "model 'mistral' not found"
+        }
+        mock_post.return_value = mock_response
+        
+        result = client.send_prompt("hello", model="mistral")
+        
+        # Should return empty or error message, not crash
+        assert result is not None
+
+
+def test_get_available_models():
+    """Test listing available models from Ollama"""
+    from llm_runner.llm import get_available_models
+    
+    with patch("requests.get") as mock_get:
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "models": [
+                {"name": "mistral:7b"},
+                {"name": "neural-chat"}
+            ]
+        }
+        mock_get.return_value = mock_response
+        
+        models = get_available_models("http://localhost:11434")
+        
+        assert len(models) == 2
+        assert "mistral:7b" in models

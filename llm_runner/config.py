@@ -8,7 +8,7 @@ def get_default_config():
     """Get default configuration"""
     return {
         "ollama_url": "http://localhost:11434",
-        "model": "mistral",
+        "model": "mistral",  # Use "mistral:7b" if standard mistral not available
         "temperature": 0.7,
     }
 
