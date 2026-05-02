@@ -132,8 +132,21 @@ def build_mode(request, config=None, model=None, use_context=False):
         model: Optional model override
         use_context: Whether to use AGENTS.md context
     """
-    # Stub for now - will implement in next todo
-    print(f"Build mode: {request}")
+    from llm_runner.config import load_config
+    from llm_runner.build_handler import handle_build_mode
+    
+    # Load config
+    if config is None or isinstance(config, str):
+        cfg = load_config(config)
+    else:
+        cfg = config
+    
+    # Override model if specified
+    if model:
+        cfg["model"] = model
+    
+    # Handle build mode
+    handle_build_mode(request, workspace_dir=".", config=cfg, use_context=use_context)
 
 
 def interactive_mode(config=None):
