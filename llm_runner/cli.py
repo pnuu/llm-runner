@@ -16,14 +16,14 @@ def parse_args(args):
     )
     
     parser.add_argument(
-        "mode_or_prompt",
+        "command",
         nargs="?",
-        help="Either '/ask' for single prompt mode, or the prompt text"
+        help="Command: 'plan', 'build', '/ask', or empty for interactive"
     )
     parser.add_argument(
-        "prompt",
+        "request_or_prompt",
         nargs="?",
-        help="The prompt text (when using /ask)"
+        help="Request text for plan/build, or prompt text for /ask"
     )
     parser.add_argument(
         "--model",
@@ -33,20 +33,28 @@ def parse_args(args):
         "--config",
         help="Path to config file"
     )
+    parser.add_argument(
+        "--context",
+        action="store_true",
+        help="Include AGENTS.md context in plan/build"
+    )
     
     parsed = parser.parse_args(args)
     
-    # Determine mode and extract prompt if needed
-    if parsed.mode_or_prompt == "/ask":
+    # Determine mode
+    if parsed.command == "plan":
+        parsed.mode = "plan"
+        parsed.request = parsed.request_or_prompt or ""
+    elif parsed.command == "build":
+        parsed.mode = "build"
+        parsed.request = parsed.request_or_prompt or ""
+    elif parsed.command == "/ask":
         parsed.mode = "ask"
-        parsed.prompt = parsed.prompt or ""
+        parsed.prompt = parsed.request_or_prompt or ""
     else:
         parsed.mode = "interactive"
-        if parsed.mode_or_prompt:
-            # If something else was passed, treat it as interactive mode
-            parsed.prompt = None
-        else:
-            parsed.prompt = None
+        parsed.prompt = None
+        parsed.request = None
     
     return parsed
 
@@ -89,6 +97,45 @@ def send_prompt_mode(prompt, config=None, model=None):
     print(response)
 
 
+def plan_mode(request, config=None, model=None, use_context=False):
+    """Execute plan mode
+    
+    Args:
+        request: The user request
+        config: Configuration dict or path
+        model: Optional model override
+        use_context: Whether to use AGENTS.md context
+    """
+    from llm_runner.config import load_config
+    from llm_runner.plan_handler import handle_plan_mode
+    
+    # Load config
+    if config is None or isinstance(config, str):
+        cfg = load_config(config)
+    else:
+        cfg = config
+    
+    # Override model if specified
+    if model:
+        cfg["model"] = model
+    
+    # Handle plan mode
+    handle_plan_mode(request, output_dir=".", config=cfg, use_context=use_context)
+
+
+def build_mode(request, config=None, model=None, use_context=False):
+    """Execute build mode
+    
+    Args:
+        request: The user request
+        config: Configuration dict or path
+        model: Optional model override
+        use_context: Whether to use AGENTS.md context
+    """
+    # Stub for now - will implement in next todo
+    print(f"Build mode: {request}")
+
+
 def interactive_mode(config=None):
     """Execute interactive chat mode
     
@@ -115,7 +162,21 @@ def run_cli(args):
     """
     parsed = parse_args(args)
     
-    if parsed.mode == "ask":
+    if parsed.mode == "plan":
+        plan_mode(
+            parsed.request,
+            config=parsed.config,
+            model=parsed.model,
+            use_context=getattr(parsed, "context", False)
+        )
+    elif parsed.mode == "build":
+        build_mode(
+            parsed.request,
+            config=parsed.config,
+            model=parsed.model,
+            use_context=getattr(parsed, "context", False)
+        )
+    elif parsed.mode == "ask":
         send_prompt_mode(parsed.prompt, config=parsed.config, model=parsed.model)
     else:
         interactive_mode(config=parsed.config)
