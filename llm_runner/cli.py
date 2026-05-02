@@ -18,12 +18,12 @@ def parse_args(args):
     parser.add_argument(
         "command",
         nargs="?",
-        help="Command: 'plan', 'build', '/ask', or empty for interactive"
+        help="Command: 'plan', 'build', 'delegate', '/ask', or empty for interactive"
     )
     parser.add_argument(
         "request_or_prompt",
         nargs="?",
-        help="Request text for plan/build, or prompt text for /ask"
+        help="Request text for plan/build/delegate, or prompt text for /ask"
     )
     parser.add_argument(
         "--model",
@@ -36,7 +36,7 @@ def parse_args(args):
     parser.add_argument(
         "--context",
         action="store_true",
-        help="Include AGENTS.md context in plan/build"
+        help="Include AGENTS.md context in plan/build/delegate"
     )
     
     parsed = parser.parse_args(args)
@@ -47,6 +47,9 @@ def parse_args(args):
         parsed.request = parsed.request_or_prompt or ""
     elif parsed.command == "build":
         parsed.mode = "build"
+        parsed.request = parsed.request_or_prompt or ""
+    elif parsed.command == "delegate":
+        parsed.mode = "delegate"
         parsed.request = parsed.request_or_prompt or ""
     elif parsed.command == "/ask":
         parsed.mode = "ask"
@@ -149,6 +152,33 @@ def build_mode(request, config=None, model=None, use_context=False):
     handle_build_mode(request, workspace_dir=".", config=cfg, use_context=use_context)
 
 
+def delegate_mode(request, config=None, model=None, use_context=False):
+    """Execute delegate mode - spawn agents to autonomously handle task
+    
+    Args:
+        request: The user request
+        config: Configuration dict or path
+        model: Optional model override
+        use_context: Whether to use AGENTS.md context
+    """
+    from llm_runner.config import load_config
+    from llm_runner.delegate_handler import handle_delegate_mode
+    
+    # Load config
+    if config is None or isinstance(config, str):
+        cfg = load_config(config)
+    else:
+        cfg = config
+    
+    # Override model if specified
+    if model:
+        cfg["model"] = model
+    
+    # Handle delegate mode
+    result = handle_delegate_mode(request, config=cfg, use_context=use_context, workspace_dir=".")
+    print(result)
+
+
 def interactive_mode(config=None):
     """Execute interactive chat mode
     
@@ -184,6 +214,13 @@ def run_cli(args):
         )
     elif parsed.mode == "build":
         build_mode(
+            parsed.request,
+            config=parsed.config,
+            model=parsed.model,
+            use_context=getattr(parsed, "context", False)
+        )
+    elif parsed.mode == "delegate":
+        delegate_mode(
             parsed.request,
             config=parsed.config,
             model=parsed.model,
