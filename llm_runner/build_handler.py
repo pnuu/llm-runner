@@ -1,8 +1,78 @@
 """Handler for build mode"""
 import os
+import re
 from llm_runner.executor import BuildExecutor
 from llm_runner.llm import OllamaClient, check_ollama_connection
 from llm_runner.plan_handler import read_agents_context
+
+
+def _execute_suggested_tools(response, executor):
+    """Parse LLM response and execute suggested tools
+    
+    Args:
+        response: LLM response text
+        executor: BuildExecutor instance to use for tool execution
+    """
+    # Pattern to match write_file(path, content) calls
+    write_pattern = r'write_file\s*\(\s*["\']([^"\']+)["\']\s*,\s*([^)]+)\)'
+    
+    matches = re.finditer(write_pattern, response, re.IGNORECASE)
+    for match in matches:
+        filepath = match.group(1)
+        content_expr = match.group(2)
+        
+        # Try to extract content - handle various formats
+        if content_expr.startswith('[') or content_expr.startswith('{'):
+            # Skip complex expressions for now
+            continue
+        
+        # Remove quotes if present
+        content = content_expr.strip().strip('"\'')
+        
+        # Execute the write_file tool
+        try:
+            result = executor.run_tool("write_file", filepath, content)
+            print(f"  ✓ {result}")
+        except Exception as e:
+            print(f"  ✗ Error: {e}")
+    
+    # Pattern to match code blocks that should be written (markdown code fences)
+    code_block_pattern = r'```\w+\n([\s\S]*?)```'
+    
+    # Look for patterns like "create file: hello.c" followed by code
+    file_pattern = r'(?:create|write|save)\s+(?:file|code)\s*:?\s*["\']?([^\s"\']+)["\']?'
+    
+    # Try to match file creation patterns with following code blocks
+    lines = response.split('\n')
+    i = 0
+    while i < len(lines):
+        # Check if line mentions creating a file
+        file_match = re.search(file_pattern, lines[i], re.IGNORECASE)
+        if file_match:
+            filepath = file_match.group(1)
+            
+            # Look for code block in next few lines
+            j = i + 1
+            while j < min(i + 10, len(lines)):
+                if lines[j].strip().startswith('```'):
+                    # Found code block, collect until closing ```
+                    code_lines = []
+                    j += 1
+                    while j < len(lines) and not lines[j].strip().startswith('```'):
+                        code_lines.append(lines[j])
+                        j += 1
+                    
+                    if code_lines:
+                        content = '\n'.join(code_lines)
+                        try:
+                            result = executor.run_tool("write_file", filepath, content)
+                            print(f"  ✓ {result}")
+                        except Exception as e:
+                            print(f"  ✗ Error: {e}")
+                    break
+                j += 1
+        
+        i += 1
 
 
 def handle_build_mode(request, workspace_dir=".", config=None, use_context=False):
@@ -57,8 +127,11 @@ def handle_build_mode(request, workspace_dir=".", config=None, use_context=False
             temperature=temperature
         )
         
-        # For now, just print the response
         print(f"\nBuild Plan:\n{response}\n")
+        
+        # Execute suggested tools from the response
+        print("Executing build tools...\n")
+        _execute_suggested_tools(response, executor)
         
         # Get summary
         summary = executor.get_summary()

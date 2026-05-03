@@ -179,11 +179,12 @@ def delegate_mode(request, config=None, model=None, use_context=False):
     print(result)
 
 
-def interactive_mode(config=None):
+def interactive_mode(config=None, model=None):
     """Execute interactive chat mode
     
     Args:
         config: Configuration dict or path
+        model: Optional model override
     """
     from llm_runner.config import load_config
     from llm_runner.chat import interactive_chat_repl
@@ -194,7 +195,7 @@ def interactive_mode(config=None):
     else:
         cfg = config
     
-    interactive_chat_repl(cfg)
+    interactive_chat_repl(cfg, model=model)
 
 
 def run_cli(args):
@@ -229,4 +230,4 @@ def run_cli(args):
     elif parsed.mode == "ask":
         send_prompt_mode(parsed.prompt, config=parsed.config, model=parsed.model)
     else:
-        interactive_mode(config=parsed.config)
+        interactive_mode(config=parsed.config, model=parsed.model)

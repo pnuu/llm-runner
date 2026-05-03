@@ -188,15 +188,20 @@ class InteractiveChat:
         return response
 
 
-def interactive_chat_repl(config=None):
+def interactive_chat_repl(config=None, model=None):
     """Run interactive REPL chat
     
     Args:
         config: Configuration dictionary
+        model: Optional model override
     """
     if config is None:
         from llm_runner.config import load_config
         config = load_config()
+    
+    # Override model if specified
+    if model:
+        config["model"] = model
     
     try:
         chat = InteractiveChat(
