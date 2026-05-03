@@ -63,8 +63,9 @@ def test_interactive_chat_process_user_input():
             
             # Test /clear command
             chat.history.add_user_message("test")
-            result = chat.process_input("/clear")
-            assert result is None
+            result, msg = chat.process_input("/clear")
+            assert result == "clear"
+            assert "cleared" in msg.lower()
             assert len(chat.history.messages) == 0
 
 
@@ -89,5 +90,5 @@ def test_interactive_chat_run_quit_command():
         with patch("llm_runner.chat.check_ollama_connection", return_value=True):
             chat = InteractiveChat()
             
-            result = chat.process_input("/quit")
+            result, msg = chat.process_input("/quit")
             assert result == "quit"
