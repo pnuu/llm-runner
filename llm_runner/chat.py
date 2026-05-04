@@ -1,5 +1,5 @@
 """Interactive chat module"""
-from llm_runner.llm import OllamaClient, check_ollama_connection
+from llm_runner.llm import OllamaClient, check_ollama_connection, get_available_models
 from llm_runner.context_manager import ContextManager
 
 
@@ -117,6 +117,14 @@ class InteractiveChat:
                 return ("clear", "Conversation history cleared.")
             elif command == "/context":
                 return ("context", self._get_context_display())
+            elif command == "/model":
+                return self._handle_model_command()
+            elif command == "/plan":
+                return self._handle_plan_command()
+            elif command == "/build":
+                return self._handle_build_command()
+            elif command == "/ask":
+                return self._handle_ask_command()
             else:
                 # Unknown command
                 return ("unknown", None)
@@ -186,6 +194,117 @@ class InteractiveChat:
         self._auto_compact_if_needed()
         
         return response
+    
+    def _handle_model_command(self):
+        """Handle /model command - interactive model selection
+        
+        Returns:
+            Tuple of (command_result, output)
+        """
+        # Get list of available models
+        url = self.client.url
+        models = get_available_models(url)
+        
+        if not models:
+            return ("model_command", "No models available.")
+        
+        # Display menu with current model highlighted
+        print("\nAvailable models:")
+        for i, model in enumerate(models, 1):
+            marker = " ← current" if model == self.model else ""
+            print(f"  {i}. {model}{marker}")
+        
+        try:
+            selection = input("\nSelect model (number or Enter for current): ").strip()
+            
+            if not selection:
+                return ("model_command", f"Using model: {self.model}")
+            
+            try:
+                idx = int(selection) - 1
+                if 0 <= idx < len(models):
+                    new_model = models[idx]
+                    self.model = new_model
+                    return ("model_command", f"Switched to model: {new_model}")
+                else:
+                    return ("model_command", "Invalid selection.")
+            except ValueError:
+                return ("model_command", "Invalid input. Using current model.")
+        except (KeyboardInterrupt, EOFError):
+            return ("model_command", "Model selection cancelled.")
+    
+    def _handle_plan_command(self):
+        """Handle /plan command - switch to plan mode
+        
+        Returns:
+            Tuple of (command_result, output)
+        """
+        try:
+            plan_request = input("Enter plan request: ").strip()
+            
+            if not plan_request:
+                return ("plan_command", "No plan request provided.")
+            
+            # Note: Actual plan generation happens in main mode, 
+            # this just returns to chat after user inputs
+            output = f"Plan mode: '{plan_request}' - complete in main mode for persistence"
+            return ("plan_command", output)
+        except (KeyboardInterrupt, EOFError):
+            return ("plan_command", "Plan mode cancelled.")
+        except Exception as e:
+            return ("plan_command", f"Error in plan mode: {e}")
+    
+    def _handle_build_command(self):
+        """Handle /build command - switch to build mode
+        
+        Returns:
+            Tuple of (command_result, output)
+        """
+        try:
+            build_request = input("Enter build request: ").strip()
+            
+            if not build_request:
+                return ("build_command", "No build request provided.")
+            
+            # Note: Actual build execution happens in main mode,
+            # this just returns to chat after user inputs
+            output = f"Build mode: '{build_request}' - complete in main mode for persistence"
+            return ("build_command", output)
+        except (KeyboardInterrupt, EOFError):
+            return ("build_command", "Build mode cancelled.")
+        except Exception as e:
+            return ("build_command", f"Error in build mode: {e}")
+    
+    def _handle_ask_command(self):
+        """Handle /ask command - context-aware single prompt
+        
+        Returns:
+            Tuple of (command_result, output)
+        """
+        try:
+            question = input("Ask (with context): ").strip()
+            
+            if not question:
+                return ("ask_command", "No question provided.")
+            
+            # Get context and include it in the prompt
+            context = self.history.get_context()
+            
+            # Send prompt with context (but don't store in history)
+            prompt_with_context = f"{context}\n\nQ: {question}" if context else question
+            response = self.client.send_prompt(
+                prompt_with_context,
+                model=self.model,
+                temperature=self.temperature
+            )
+            
+            # Important: Do NOT add to history
+            output = f"[Not stored in history]\n{response}"
+            return ("ask_command", output)
+        except (KeyboardInterrupt, EOFError):
+            return ("ask_command", "Ask command cancelled.")
+        except Exception as e:
+            return ("ask_command", f"Error in ask command: {e}")
 
 
 def interactive_chat_repl(config=None, model=None):
@@ -236,7 +355,8 @@ def interactive_chat_repl(config=None, model=None):
     if chat.model not in available and available:
         print(f"⚠️  Warning: '{chat.model}' not found in available models!")
         print(f"   Try: llm-runner --model {available[0]}")
-    print("Type '/quit' to exit, '/clear' to clear history, '/context' to see context info")
+    print("Commands: '/quit' (exit), '/clear' (history), '/context' (info), '/model' (select),")
+    print("          '/plan' (plan mode), '/build' (build mode), '/ask' (non-storing ask)")
     print()
     
     while True:
@@ -256,6 +376,18 @@ def interactive_chat_repl(config=None, model=None):
                 print(output)
                 continue
             elif command_result == "context":
+                print(f"\n{output}\n")
+                continue
+            elif command_result == "model_command":
+                print(f"\n{output}\n")
+                continue
+            elif command_result == "plan_command":
+                print(f"\n{output}\n")
+                continue
+            elif command_result == "build_command":
+                print(f"\n{output}\n")
+                continue
+            elif command_result == "ask_command":
                 print(f"\n{output}\n")
                 continue
             elif command_result == "unknown":

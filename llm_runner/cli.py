@@ -18,7 +18,7 @@ def parse_args(args):
     parser.add_argument(
         "command",
         nargs="?",
-        help="Command: 'plan', 'build', 'delegate', '/ask', or empty for interactive"
+        help="Command: 'plan', 'build', 'delegate', 'ask', or empty for interactive"
     )
     parser.add_argument(
         "request_or_prompt",
@@ -51,9 +51,10 @@ def parse_args(args):
     elif parsed.command == "delegate":
         parsed.mode = "delegate"
         parsed.request = parsed.request_or_prompt or ""
-    elif parsed.command == "/ask":
+    elif parsed.command == "ask" or parsed.command == "/ask":
         parsed.mode = "ask"
         parsed.prompt = parsed.request_or_prompt or ""
+        parsed.request = parsed.request_or_prompt or ""
     else:
         parsed.mode = "interactive"
         parsed.prompt = None
