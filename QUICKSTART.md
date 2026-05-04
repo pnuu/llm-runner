@@ -284,7 +284,12 @@ llm-runner /ask "Is this code correct?" --model dolphin-mixtral
 ## Getting Help
 
 - See model responses: `llm-runner --help`
-- Read documentation: `README.md`, `ARCHITECTURE.md`, `DEVELOPMENT.md`
+- Read documentation:
+  - [README.md](README.md) - Main overview and features
+  - [CLI_REFERENCE.md](CLI_REFERENCE.md) - Complete command reference
+  - [INTERACTIVE_CHAT.md](INTERACTIVE_CHAT.md) - Interactive mode guide
+  - [ARCHITECTURE.md](ARCHITECTURE.md) - System design details
+  - [DEVELOPMENT.md](DEVELOPMENT.md) - Contributing and extending
 - Check config: `cat ~/.llm_runner/config.yaml`
 
 ## Performance Tips

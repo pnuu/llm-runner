@@ -408,7 +408,7 @@ Alternatively, just type the number directly.
 
 ## Session Persistence
 
-Interactive sessions are automatically preserved:
+Interactive sessions can be automatically preserved and restored:
 
 ```bash
 # Start chat
@@ -416,12 +416,11 @@ $ llm-runner
 You: [conversation]
 You: /quit
 
-# Later: restore session
+# Later: can restore session manually or start fresh
 $ llm-runner
-# Session automatically restored if available
 ```
 
-See [SESSION_PRESERVATION.md](SESSION_PRESERVATION.md) for advanced session management.
+Sessions allow you to pause and resume conversations across multiple sessions.
 
 ## Troubleshooting
 
