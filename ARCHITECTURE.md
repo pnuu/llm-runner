@@ -34,10 +34,48 @@ def parse_args(argv):
 
 ### Interactive Mode: `chat.py`
 
-Multi-turn conversation REPL:
-- Maintains conversation history
-- Supports `/clear` and `/quit` commands
-- Graceful handling of errors and Ollama timeouts
+Multi-turn conversation REPL with command dispatch:
+
+**Core Components:**
+- `InteractiveChat` - Main conversation session manager
+- `ConversationHistory` - Message storage with context tracking
+- Command handlers for special operations
+
+**Built-in Commands:**
+- `/model` - Interactive model selection (display available, let user choose)
+- `/plan` - Generate plan within chat context
+- `/build` - Execute build mode within chat context
+- `/ask` - Context-aware query without storing in history
+- `/context` - Display token usage and context statistics
+- `/clear` - Clear conversation history
+- `/quit` - Exit chat
+
+**Command Flow:**
+```
+User Input
+    ↓
+process_input() [checks if starts with /]
+    ↓
+Command?
+    ├─ /model → _handle_model_command() → display models, accept selection
+    ├─ /plan → _handle_plan_command() → prompt for request, generate, return
+    ├─ /build → _handle_build_command() → prompt for request, execute, return
+    ├─ /ask → _handle_ask_command() → query with context, no history storage
+    ├─ /context → _get_context_display() → show usage stats
+    ├─ /clear → clear history
+    ├─ /quit → exit signal
+    └─ Unknown → return (unknown, None)
+    ↓
+No command?
+    ↓
+send_message() → LLM response → add to history
+```
+
+**Context Management:**
+- Dynamic context length via `get_model_context_length()`
+- Automatic compaction when threshold exceeded (90%)
+- Token counting for all messages
+- Over-threshold warnings
 
 ### Plan Mode: `plan_handler.py`
 

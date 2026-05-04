@@ -5,10 +5,13 @@ A fully-featured CLI tool for autonomous task execution using local LLMs via Oll
 ## Features
 
 - **Interactive Chat**: Multi-turn conversations with Ollama-hosted models
-- **Single Prompt Mode**: Quick queries with `/ask`
-- **Plan Generation**: Structured task planning with `/plan`
-- **Build Mode**: Safe file/command execution with `/build`
-- **Agent Delegation**: Autonomous multi-agent task execution with `/delegate`
+  - Built-in commands: `/model` (switch models), `/plan` (plan mode), `/build` (build mode), `/ask` (context-aware queries)
+  - Automatic context compaction when exceeding token limits
+  - Session preservation across restarts
+- **Single Prompt Mode**: Quick queries with `ask` command (formerly `/ask`)
+- **Plan Generation**: Structured task planning
+- **Build Mode**: Safe file/command execution
+- **Agent Delegation**: Autonomous multi-agent task execution
   - Task decomposition via LLM
   - Sequential and parallel execution
   - Sub-agent coordination with cycle detection
@@ -31,8 +34,9 @@ Requires:
 # Interactive chat (default)
 llm-runner
 
-# Single prompt
-llm-runner /ask "What is Python?"
+# Single prompt (ask mode)
+llm-runner ask "What is Python?"        # New: without slash
+llm-runner /ask "What is Python?"       # Still works for backwards compatibility
 
 # Generate a plan
 llm-runner plan "Build a REST API"
@@ -42,46 +46,87 @@ llm-runner build "Add unit tests"
 
 # Delegate to agents (multi-agent execution)
 llm-runner delegate "Create and test a user authentication system"
+
+# Override model for any command
+llm-runner --model llama3:8b ask "Quick question"
+llm-runner --model mistral:7b plan "My project"
 ```
+
+See [CLI_REFERENCE.md](CLI_REFERENCE.md) for complete command documentation.
 
 ## CLI Commands
 
 ### Interactive Mode
 ```
-llm-runner
+llm-runner [--model MODEL] [--config CONFIG]
 ```
-Multi-turn chat with history. Commands:
-- `/clear` - Clear conversation history
-- `/quit` - Exit
 
-### Single Prompt
+Multi-turn chat with full history and context management.
+
+**Interactive Commands** (type inside chat):
+- `/model` - Interactive model selector (switch between available models)
+- `/plan` - Switch to plan mode, then return to chat
+- `/build` - Switch to build mode, then return to chat
+- `/ask` - Ask a question using conversation context (not stored in history)
+- `/context` - Show context usage and token statistics
+- `/clear` - Clear conversation history
+- `/quit` - Exit chat
+
+Example session:
 ```
-llm-runner /ask "Your question here"
+You: How do I build a REST API?
+Assistant: [response]
+You: /model
+  1. mistral:7b  ← current
+  2. llama3:8b
+  3. neural-chat
+Select: 2
+You: Same question to llama3
+Assistant: [different response from llama3]
 ```
+
+See [INTERACTIVE_CHAT.md](INTERACTIVE_CHAT.md) for detailed guide and workflows.
+
+### Single Prompt (Ask Mode)
+```
+llm-runner ask "Your question here"
+llm-runner ask "What is Python?" --model llama3:8b
+```
+
+Quick one-shot queries without storing in history. Use `ask` (or `/ask` for backwards compatibility).
 
 ### Plan Mode
 ```
 llm-runner plan "Task description"
-llm-runner plan "Task" --context              # Include AGENTS.md context
-llm-runner plan "Task" --model mistral:7b     # Use specific model
+llm-runner plan "Build a REST API" --context              # Include AGENTS.md
+llm-runner plan "Task" --model mistral:7b                # Use specific model
 ```
-Generates a structured plan.md file without execution.
+
+Generates a structured `plan.md` file without execution.
 
 ### Build Mode
 ```
 llm-runner build "Task description"
-llm-runner build "Task" --context             # Include AGENTS.md
-llm-runner build "Task" --model neural-chat   # Use specific model
+llm-runner build "Add unit tests" --context              # Include AGENTS.md
+llm-runner build "Create file" --model neural-chat       # Use specific model
 ```
+
 Safely executes file operations and commands with error recovery.
 
 ### Delegate Mode (Agent Orchestration)
 ```
 llm-runner delegate "Complex task"
-llm-runner delegate "Task" --context
+llm-runner delegate "Create auth system" --context
 llm-runner delegate "Task" --model mistral:7b
 ```
+
 Decomposes task into sub-tasks and orchestrates multi-agent execution.
+
+## Global Flags
+
+- `--model MODEL` - Override configured default model (works with all modes)
+- `--config PATH` - Load config from custom path (instead of `~/.llm_runner/config.yaml`)
+- `--context` - Include `AGENTS.md` in context (plan/build/delegate modes only)
 
 ## Architecture
 
@@ -163,7 +208,7 @@ Run with coverage:
 pytest --cov=llm_runner
 ```
 
-Current status: **142 tests** across 23 test files (100% passing)
+Current status: **281 tests** across 25+ test files (100% passing)
 
 ## Development
 

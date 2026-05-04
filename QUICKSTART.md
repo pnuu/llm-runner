@@ -19,23 +19,74 @@ pip install -e .
 ```bash
 llm-runner
 ```
-Chat with an LLM model. Type `/quit` to exit, `/clear` to reset history.
 
+Multi-turn chat with built-in commands. Type `/quit` to exit, `/clear` to reset history.
+
+**Basic Example:**
 ```
-> What's the capital of France?
+You: What's the capital of France?
 Assistant: The capital of France is Paris...
 
-> Tell me more
+You: Tell me more
 Assistant: Paris is located on the Seine River...
 
-/quit
+You: /quit
+Goodbye!
 ```
 
-### 2. Single Prompt
-```bash
-llm-runner /ask "What is Python?"
+**Interactive Commands:**
 ```
+You: /model                # Switch between available models
+You: /plan                 # Generate a plan within chat
+You: /build                # Execute build tasks from chat
+You: /ask                  # Ask questions without storing in history
+You: /context              # Show token usage and context info
+You: /clear                # Clear conversation history
+You: /quit                 # Exit chat
+```
+
+**Advanced Example with Commands:**
+```
+You: I'm building a REST API. What endpoints should I have?
+Assistant: For a complete REST API...
+
+You: /model
+Available models:
+  1. mistral:7b ← current
+  2. llama3:8b
+Select: 2
+Switched to model: llama3:8b
+
+You: What's your recommendation?
+Assistant: [Response from llama3, different perspective]
+
+You: /plan
+Enter plan request: Design REST API endpoints
+Plan mode: 'Design REST API endpoints' - complete in main mode for persistence
+
+You: /context
+=== Context Usage ===
+Messages: 5
+Tokens: 2,456 / 32,768
+Usage: 7%
+
+You: /quit
+```
+
+See [INTERACTIVE_CHAT.md](INTERACTIVE_CHAT.md) for complete guide.
+
+### 2. Single Prompt (Ask Mode)
+```bash
+llm-runner ask "What is Python?"     # New: preferred format
+llm-runner /ask "What is Python?"    # Also works (backwards compatible)
+```
+
 Get a quick answer without entering chat mode.
+
+```bash
+$ llm-runner ask "Explain recursion in 1 sentence"
+Recursion is a programming technique where a function calls itself to solve smaller instances of the same problem.
+```
 
 ### 3. Generate a Plan
 ```bash
