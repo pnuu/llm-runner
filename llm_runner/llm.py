@@ -12,6 +12,7 @@ class OllamaClient:
             url: Ollama API endpoint URL
         """
         self.url = url
+        self._context_length_cache = {}
     
     def send_prompt(self, prompt, model="mistral", temperature=0.7):
         """Send a prompt to Ollama and get response
@@ -49,6 +50,43 @@ class OllamaClient:
             return f"[Error: Connection failed: {str(e)}]"
         except Exception as e:
             return f"[Error: {str(e)}]"
+    
+    def get_model_context_length(self, model_name):
+        """Get context length (max tokens) for a model
+        
+        Args:
+            model_name: Name of the model (e.g., "mistral:7b")
+            
+        Returns:
+            Context length in tokens, or 4096 if unable to determine
+        """
+        # Check cache first
+        if model_name in self._context_length_cache:
+            return self._context_length_cache[model_name]
+        
+        try:
+            endpoint = f"{self.url}/api/show"
+            payload = {"name": model_name}
+            
+            response = requests.post(endpoint, json=payload, timeout=10)
+            data = response.json()
+            
+            # Try to get context length from model_info
+            model_info = data.get("model_info", {})
+            context_length = model_info.get("llama.context_length")
+            
+            if context_length is None:
+                # Fallback to default
+                context_length = 4096
+            
+            # Cache the result
+            self._context_length_cache[model_name] = context_length
+            return context_length
+            
+        except Exception:
+            # On any error, return default and cache it
+            self._context_length_cache[model_name] = 4096
+            return 4096
 
 
 def get_available_models(url="http://localhost:11434"):

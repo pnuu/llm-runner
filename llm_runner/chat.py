@@ -204,11 +204,20 @@ def interactive_chat_repl(config=None, model=None):
         config["model"] = model
     
     try:
+        # Fetch actual context length from the model
+        from llm_runner.llm import OllamaClient
+        client = OllamaClient(url=config.get("ollama_url", "http://localhost:11434"))
+        model_name = config.get("model", "mistral")
+        max_context_tokens = client.get_model_context_length(model_name)
+        
+        # Store in config for later use
+        config["max_context_tokens"] = max_context_tokens
+        
         chat = InteractiveChat(
             ollama_url=config.get("ollama_url", "http://localhost:11434"),
             model=config.get("model", "mistral"),
             temperature=config.get("temperature", 0.7),
-            max_context_tokens=config.get("max_context_tokens", 4096)
+            max_context_tokens=max_context_tokens
         )
     except Exception as e:
         print(f"Error: {e}")
