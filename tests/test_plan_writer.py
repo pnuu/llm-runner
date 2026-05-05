@@ -90,3 +90,152 @@ def test_plan_writer_handles_existing_file():
         with open(filepath, "r") as f:
             content = f.read()
             assert "New Plan" in content
+
+
+def test_plan_writer_write_refined_plan():
+    """Test writing refined plan content"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        refined_content = "# Refined Plan\n\n## New Section\nRefined content"
+        
+        writer = PlanWriter(output_dir=tmpdir)
+        success, backup, filepath = writer.write_refined_plan(refined_content)
+        
+        assert success is True
+        assert filepath.endswith("plan.md")
+        assert os.path.exists(filepath)
+        
+        with open(filepath, "r") as f:
+            content = f.read()
+            assert content == refined_content
+
+
+def test_plan_writer_write_refined_plan_creates_backup():
+    """Test that writing refined plan creates backup of original"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        plan_path = os.path.join(tmpdir, "plan.md")
+        
+        # Create original plan
+        with open(plan_path, "w") as f:
+            f.write("# Original Plan\n\nOriginal content")
+        
+        # Write refined plan
+        refined_content = "# Refined Plan\n\nRefined content"
+        writer = PlanWriter(output_dir=tmpdir)
+        success, backup, filepath = writer.write_refined_plan(refined_content, filepath=plan_path)
+        
+        assert success is True
+        assert backup is not None
+        assert os.path.exists(backup)
+        
+        # Verify backup has original content
+        with open(backup, "r") as f:
+            backup_content = f.read()
+            assert "Original Plan" in backup_content
+        
+        # Verify plan has refined content
+        with open(plan_path, "r") as f:
+            plan_content = f.read()
+            assert "Refined Plan" in plan_content
+
+
+def test_plan_writer_write_refined_plan_no_backup_if_file_missing():
+    """Test refined plan write when file doesn't exist yet"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        plan_path = os.path.join(tmpdir, "new_plan.md")
+        
+        refined_content = "# New Plan\n\nNew content"
+        writer = PlanWriter(output_dir=tmpdir)
+        success, backup, filepath = writer.write_refined_plan(refined_content, filepath=plan_path)
+        
+        assert success is True
+        assert backup is None  # No backup since file didn't exist
+        assert os.path.exists(filepath)
+        
+        with open(filepath, "r") as f:
+            content = f.read()
+            assert content == refined_content
+
+
+def test_plan_writer_write_refined_plan_error_handling():
+    """Test error handling in write_refined_plan"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        writer = PlanWriter(output_dir=tmpdir)
+        
+        # Try to write to a path with invalid parent directory
+        invalid_path = "/root/invalid/nonexistent/path/plan.md"
+        success, backup, error_msg = writer.write_refined_plan("content", filepath=invalid_path)
+        
+        assert success is False
+        assert isinstance(error_msg, str)
+
+
+def test_plan_writer_create_backup():
+    """Test backup creation"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        plan_path = os.path.join(tmpdir, "plan.md")
+        
+        # Create original file
+        with open(plan_path, "w") as f:
+            f.write("Original content")
+        
+        writer = PlanWriter(output_dir=tmpdir)
+        backup_path = writer._create_backup(plan_path)
+        
+        assert backup_path is not None
+        assert os.path.exists(backup_path)
+        assert "backups" in backup_path
+        
+        with open(backup_path, "r") as f:
+            content = f.read()
+            assert content == "Original content"
+
+
+def test_plan_writer_create_backup_nonexistent_file():
+    """Test backup creation for nonexistent file"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        plan_path = os.path.join(tmpdir, "nonexistent.md")
+        
+        writer = PlanWriter(output_dir=tmpdir)
+        backup_path = writer._create_backup(plan_path)
+        
+        assert backup_path is None
+
+
+def test_plan_writer_create_backup_multiple_times():
+    """Test creating multiple backups"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        plan_path = os.path.join(tmpdir, "plan.md")
+        
+        # Create and backup first version
+        with open(plan_path, "w") as f:
+            f.write("Version 1")
+        
+        writer = PlanWriter(output_dir=tmpdir)
+        backup1 = writer._create_backup(plan_path)
+        
+        # Update and backup second version
+        import time
+        time.sleep(1.01)  # Sleep long enough to get different second
+        
+        with open(plan_path, "w") as f:
+            f.write("Version 2")
+        
+        backup2 = writer._create_backup(plan_path)
+        
+        # Both backups should exist
+        assert os.path.exists(backup1)
+        assert os.path.exists(backup2)
+        
+        # Backups should be different files (or same path but different content)
+        # Verify content
+        with open(backup1, "r") as f:
+            content1 = f.read()
+            assert content1 == "Version 1"
+        
+        with open(backup2, "r") as f:
+            content2 = f.read()
+            assert content2 == "Version 2"
+        
+        # Backups directory should exist
+        backup_dir = os.path.dirname(backup1)
+        assert os.path.exists(backup_dir)

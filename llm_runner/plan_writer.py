@@ -94,3 +94,32 @@ class PlanWriter:
             return backup_path
         except Exception:
             return None
+    
+    def write_refined_plan(self, refined_content, filepath=None):
+        """Write refined plan content to file with backup
+        
+        Used when saving refinements detected from chat conversation.
+        Creates backup of original before overwriting.
+        
+        Args:
+            refined_content: Full refined plan markdown content
+            filepath: Path to plan file (default: plan.md in output_dir)
+            
+        Returns:
+            Tuple of (success: bool, backup_path: str or None, filepath: str)
+        """
+        if filepath is None:
+            filepath = os.path.join(self.output_dir, "plan.md")
+        
+        try:
+            # Create backup if file exists
+            backup_path = self._create_backup(filepath)
+            
+            # Write refined content
+            with open(filepath, "w") as f:
+                f.write(refined_content)
+            
+            return (True, backup_path, filepath)
+        
+        except Exception as e:
+            return (False, None, str(e))

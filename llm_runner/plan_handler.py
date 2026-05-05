@@ -181,15 +181,16 @@ def detect_and_save_plan_refinement(plan_state, chat_content, output_dir=".", co
         if not refined_plan:
             return False
         
-        # Save the refined plan
+        # Save the refined plan using write_refined_plan
         writer = PlanWriter(output_dir=output_dir)
+        success, backup_path, result = writer.write_refined_plan(
+            refined_plan,
+            filepath=plan_state["plan_path"]
+        )
         
-        # Create backup of original plan
-        backup_path = writer._create_backup(plan_state["plan_path"])
-        
-        # Write refined plan
-        with open(plan_state["plan_path"], "w") as f:
-            f.write(refined_plan)
+        if not success:
+            print(f"✗ Error saving refined plan: {result}")
+            return False
         
         print(f"✓ Plan refined and saved to: {plan_state['plan_path']}")
         if backup_path:
