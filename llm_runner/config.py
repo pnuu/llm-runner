@@ -10,6 +10,18 @@ def get_default_config():
         "ollama_url": "http://localhost:11434",
         "model": "mistral",  # Use "mistral:7b" if standard mistral not available
         "temperature": 0.7,
+        "chat": {
+            "ui": {
+                "colors": {
+                    "user_message": "light_gray",
+                    "ai_message": "white",
+                    "status_line": "cyan",
+                    "command_window": "white",
+                },
+                "show_status_line": True,
+                "show_command_window": True,
+            }
+        }
     }
 
 
@@ -47,4 +59,46 @@ def load_config(path=None):
     with open(path, "r") as f:
         config = yaml.safe_load(f)
     
-    return config if config else get_default_config()
+    if not config:
+        config = {}
+    
+    # Merge with defaults to ensure all keys exist
+    merged = get_default_config()
+    _deep_merge(merged, config)
+    
+    return merged
+
+
+def _deep_merge(base, override):
+    """Recursively merge override dict into base dict (in-place).
+    
+    Args:
+        base: Base dictionary (modified in-place)
+        override: Dictionary with overrides
+    """
+    for key, value in override.items():
+        if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+            _deep_merge(base[key], value)
+        else:
+            base[key] = value
+
+
+def get_chat_colors(config):
+    """Get chat UI color configuration from config.
+    
+    Args:
+        config: Configuration dictionary
+    
+    Returns:
+        Dictionary with color settings, defaults applied
+    """
+    try:
+        colors = config.get("chat", {}).get("ui", {}).get("colors", {})
+        # Return with defaults filled in
+        defaults = get_default_config()["chat"]["ui"]["colors"]
+        merged = defaults.copy()
+        merged.update(colors)
+        return merged
+    except (KeyError, TypeError, AttributeError):
+        # Fall back to defaults if anything goes wrong
+        return get_default_config()["chat"]["ui"]["colors"]

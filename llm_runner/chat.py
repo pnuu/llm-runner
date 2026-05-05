@@ -1,6 +1,8 @@
 """Interactive chat module"""
 from llm_runner.llm import OllamaClient, check_ollama_connection, get_available_models
 from llm_runner.context_manager import ContextManager
+from llm_runner.ui_formatter import ChatUIFormatter
+from llm_runner.config import get_chat_colors
 
 
 class ConversationHistory:
@@ -344,6 +346,10 @@ def interactive_chat_repl(config=None, model=None):
     
     url = config.get("ollama_url", "http://localhost:11434")
     
+    # Initialize UI formatter with color config
+    color_config = get_chat_colors(config)
+    formatter = ChatUIFormatter(color_config)
+    
     # Show available models if default isn't found
     from llm_runner.llm import get_available_models
     available = get_available_models(url)
@@ -361,7 +367,21 @@ def interactive_chat_repl(config=None, model=None):
     
     while True:
         try:
-            user_input = input("You: ").strip()
+            # Get context percentage for status line
+            context_info = chat.history.get_context_info()
+            context_percent = context_info.get('percent_of_max', 0)
+            
+            # Show status line before input
+            status = formatter.format_status_line(
+                model=chat.model,
+                mode="interactive",
+                context_percent=context_percent
+            )
+            print(status)
+            
+            # Get user input with formatted prompt
+            prompt = formatter.format_command_prompt()
+            user_input = input(prompt).strip()
             
             if not user_input:
                 continue
@@ -396,7 +416,10 @@ def interactive_chat_repl(config=None, model=None):
             
             # Send message to LLM
             response = chat.send_message(user_input)
-            print(f"\nAssistant: {response}\n")
+            
+            # Format and display response (no "Assistant:" label)
+            formatted_response = formatter.format_ai_message(response)
+            print(f"\n{formatted_response}\n")
             
         except KeyboardInterrupt:
             print("\nGoodbye!")
