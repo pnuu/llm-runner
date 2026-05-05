@@ -67,27 +67,116 @@ You: Now I'm using llama3!
 - Switch to faster model for quick queries
 - Try specialized models (e.g., code-focused models)
 
-### `/plan` - Plan Mode Within Chat
+### `/plan` - Plan Refinement Mode
 
-Generate a structured plan without switching modes.
+Enter interactive plan refinement mode to discuss and refine an existing plan.md file, or create a new plan with full context preservation.
 
 **Usage**:
 ```
 You: /plan
-Enter plan request: Design a user authentication system
 
-Plan mode: 'Design a user authentication system' - complete in main mode for persistence
+=== Current Plan Summary ===
+
+• Microservices Deployment
+  • Architecture Review
+    - Service dependencies
+    - Load balancer strategy
+  • Deployment Strategy
+    - Blue-green deployment
+    - Canary releases
+  • Testing Plan
+    - Integration tests
+    - Performance tests
+
+Plan added to conversation context. You can now refine it.
+
+You: Add a section about monitoring
+AI: I'll add comprehensive monitoring to the plan...
+
+You: /build
+Plan refined and saved to: ./plan.md
+  Backup saved to: ./backups/plan.md.20250505_150000.backup
 ```
 
-**Behavior**:
-- Prompts for plan request
-- Generates plan using current context
-- Returns to chat after completion
-- Context remains intact
+**Features**:
+- **Automatic Outline Display**: Shows condensed summary of plan.md on entry (max 30 lines)
+- **Plan Context Injection**: Plan content automatically added to conversation for seamless discussion
+- **Change Detection**: Intelligently detects when you refine the plan during conversation
+- **Auto-Save**: Refinements automatically saved to plan.md with timestamp-based backups
+- **Backup Creation**: Original plan preserved in ./backups/ before refinements
+- **Mode Transitions**: Automatically exits plan mode when using other commands (/build, /ask, /model, /quit)
+
+**How It Works**:
+
+1. **Enter Plan Mode**: Type `/plan` to enter refinement mode
+   - If plan.md exists, its outline is displayed
+   - Plan content added to conversation context
+   - Ready for discussion and refinement
+
+2. **Discuss and Refine**: Have natural conversation about the plan
+   - Add new sections: "Add a monitoring section"
+   - Modify existing content: "Change the timeline to 6 weeks"
+   - Ask clarifying questions: "What about error handling?"
+
+3. **Automatic Detection**: LLM Runner detects meaningful refinements
+   - Monitors for keywords: add, create, modify, update, remove, etc.
+   - Analyzes structural changes (new sections, bullet points)
+   - Uses confidence scoring (0.65 threshold) to distinguish discussion from refinement
+
+4. **Auto-Save**: When exiting plan mode or using other commands
+   - Detected refinements automatically saved to plan.md
+   - Original plan backed up to ./backups/plan.md.TIMESTAMP.backup
+   - Confirmation message shows backup location
+
+**Refinement Keywords Detected**:
+- **Adding**: "add", "create", "new", "include", "implement"
+- **Removing**: "remove", "delete", "eliminate", "drop"
+- **Modifying**: "change", "update", "modify", "revise"
+- **Structural**: Section markers (##), bullet points, numbered lists
+
+**Example Session**:
+```
+You: /plan
+
+=== Current Plan Summary ===
+
+• API Development
+  • Phase 1: Design
+    - Architecture review
+    - API specification
+  • Phase 2: Implementation
+    - Backend development
+    - Testing
+
+Plan added to conversation context. You can now refine it.
+
+You: Let's add security considerations to Phase 1
+AI: Good idea. I'll add a section on security considerations including 
+authentication, authorization, data encryption, and API rate limiting.
+
+## Security Considerations
+- OAuth 2.0 for authentication
+- Role-based access control
+- End-to-end encryption
+- Rate limiting and DDoS protection
+
+You: /build
+✓ Plan refined and saved to: ./plan.md
+  Backup saved to: ./backups/plan.md.20250505_150812.backup
+
+Switched to build mode...
+```
 
 **Difference from Main Mode**:
-- Chat mode: `/plan` is for quick planning within conversation
-- Main mode: `llm-runner plan "request"` creates persistent plan.md file
+- **Chat mode** (`/plan`): Interactive refinement with context, auto-save on exit, displays outline
+- **Main mode** (`llm-runner plan "request"`): Creates new plan.md from scratch, full-screen focused mode
+
+**Tips**:
+- Use explicit language ("add", "create", "modify") to ensure refinements are detected
+- Plan context persists through your entire conversation
+- Multiple refinement iterations are tracked with timestamped backups
+- To view context usage, use `/context` command
+- To exit without saving changes, use `/quit` or other commands - refinements only save if detected
 
 ### `/build` - Build Mode Within Chat
 
@@ -405,6 +494,132 @@ Select: [type number and press Enter]
 ```
 
 Alternatively, just type the number directly.
+
+## Plan Refinement Workflow
+
+The plan refinement feature enables iterative plan improvement through natural conversation.
+
+### Complete Workflow Example
+
+```
+# Step 1: Enter plan mode (displays existing plan summary)
+You: /plan
+
+=== Current Plan Summary ===
+
+• Q2 Development Roadmap
+  • Frontend Enhancements
+    - Dashboard redesign
+    - Performance optimization
+  • Backend Services
+    - API optimization
+    - Database migration
+  • DevOps
+    - CI/CD pipeline improvements
+    - Monitoring setup
+
+Plan added to conversation context. You can now refine it.
+
+# Step 2: Discuss and refine
+You: Let's add security testing to the frontend enhancements
+AI: Great idea. I'll add security testing as a subtask in the Frontend 
+Enhancements section. This should include penetration testing, OWASP compliance 
+checks, and security code review.
+
+# Step 3: Continue refining
+You: Also add load testing to backend
+AI: I'll add load testing and stress testing to the Backend Services section...
+
+# Step 4: Exit to save (or use another command)
+You: /build
+
+✓ Plan refined and saved to: ./plan.md
+  Backup saved to: ./backups/plan.md.20250505_150812.backup
+
+# Plan.md now includes both new sections and original content preserved
+```
+
+### How Refinement Detection Works
+
+The system uses intelligent analysis to distinguish between discussion and refinement:
+
+**1. Keyword Analysis**
+- Explicit change keywords: "add", "create", "modify", "remove", "update"
+- Weighted scoring: Different keywords have different confidence weights
+
+**2. Structural Analysis**
+- Detects new markdown sections (##)
+- Counts bullet points and numbered lists
+- Identifies new structured content
+
+**3. Confidence Scoring**
+- Combines keyword and structural analysis
+- Threshold: 0.65 confidence required
+- Only meaningful changes trigger auto-save
+
+**Example: What Triggers Refinement**
+```
+✅ "Add a section on error handling" → Detected (explicit keyword)
+✅ "Create a new testing phase" → Detected (create keyword + structure)
+✅ "Update the timeline to 8 weeks" → Detected (update keyword)
+❌ "What's the timeline?" → Not detected (question, no change keywords)
+❌ "That sounds good" → Not detected (discussion, no change keywords)
+```
+
+### Backup Management
+
+Refinements are saved with automatic backups:
+
+```bash
+# Directory structure after refinement
+.
+├── plan.md                                    # Current refined version
+└── backups/
+    ├── plan.md.20250505_143000.backup        # First backup
+    ├── plan.md.20250505_143500.backup        # Second backup
+    └── plan.md.20250505_150812.backup        # Latest backup
+
+# Backups are timestamped (YYYYMMDD_HHMMSS format)
+# Each refinement creates a new backup of the previous version
+```
+
+You can manually restore from backups:
+```bash
+cp backups/plan.md.20250505_143000.backup plan.md
+```
+
+### Best Practices
+
+1. **Be Explicit**: Use clear language when refining
+   - ✅ "Add a performance testing section"
+   - ❌ "We should probably think about testing"
+
+2. **Preserve Context**: Plan remains available throughout conversation
+   - Reference existing sections by name
+   - Build on previous decisions
+   - Maintain consistency
+
+3. **Check Progress**: Use `/context` to monitor token usage
+   - Long plans consume more context space
+   - May need to `/clear` in very long sessions
+
+4. **Review Backups**: Check backups if unexpected changes occur
+   ```bash
+   ls -la backups/
+   cat backups/plan.md.20250505_143000.backup
+   ```
+
+5. **Transition Modes**: Exit plan mode intentionally
+   - Using `/build`: Saves refinements then switches to build mode
+   - Using `/ask`: Automatically exits plan mode first
+   - Using `/quit`: Saves refinements then exits application
+
+### Limitations & Considerations
+
+- **Refinement Detection**: May not detect implicit changes (e.g., "let's discuss deployment")
+- **Context Space**: Large plans consume more conversation context
+- **Single Plan**: Each directory has one plan.md; starting new mode creates new entry
+- **Overwrite Protection**: Original content preserved in backups before any updates
 
 ## Session Persistence
 
