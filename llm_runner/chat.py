@@ -99,6 +99,7 @@ class InteractiveChat:
         self.history = ConversationHistory(max_tokens=max_context_tokens)
         self.auto_compact_enabled = True
         self.auto_compact_threshold_percent = 90
+        self.plan_mode_state = None  # Track state when in plan refinement mode
     
     def process_input(self, user_input):
         """Process user input, handling commands
@@ -111,6 +112,10 @@ class InteractiveChat:
         """
         if user_input.startswith("/"):
             command = user_input.lower().strip()
+            
+            # When executing any command other than /plan, exit plan mode first
+            if self.plan_mode_state and command != "/plan":
+                self.exit_plan_mode()
             
             if command == "/quit":
                 return ("quit", None)
@@ -236,25 +241,81 @@ class InteractiveChat:
             return ("model_command", "Model selection cancelled.")
     
     def _handle_plan_command(self):
-        """Handle /plan command - switch to plan mode
+        """Handle /plan command - enter plan refinement mode
+        
+        This enters interactive plan refinement mode where:
+        1. Existing plan.md is displayed as outline
+        2. Plan content is added to conversation context
+        3. Refinements are detected and saved on exit
         
         Returns:
             Tuple of (command_result, output)
         """
         try:
-            plan_request = input("Enter plan request: ").strip()
+            from llm_runner.plan_handler import handle_interactive_plan_refinement
             
-            if not plan_request:
-                return ("plan_command", "No plan request provided.")
+            # Enter plan refinement mode and setup context
+            plan_state = handle_interactive_plan_refinement(output_dir=".")
             
-            # Note: Actual plan generation happens in main mode, 
-            # this just returns to chat after user inputs
-            output = f"Plan mode: '{plan_request}' - complete in main mode for persistence"
+            if not plan_state:
+                return ("plan_command", "Error entering plan refinement mode.")
+            
+            # Store plan state for later refinement detection
+            self.plan_mode_state = plan_state
+            
+            # Add plan to conversation context as system message
+            if plan_state["has_existing_plan"] and plan_state["original_plan"]:
+                # Add plan file as context
+                plan_context = f"""[PLAN CONTEXT]
+The following is the current plan file being refined:
+
+{plan_state['original_plan']}
+[END PLAN CONTEXT]"""
+                
+                self.history.add_user_message(plan_context)
+            
+            output = "Entered plan refinement mode. You can now discuss and refine the plan."
             return ("plan_command", output)
+        
         except (KeyboardInterrupt, EOFError):
-            return ("plan_command", "Plan mode cancelled.")
+            self.plan_mode_state = None
+            return ("plan_command", "Plan refinement mode cancelled.")
         except Exception as e:
-            return ("plan_command", f"Error in plan mode: {e}")
+            self.plan_mode_state = None
+            return ("plan_command", f"Error in plan refinement mode: {e}")
+    
+    def exit_plan_mode(self):
+        """Exit plan mode and detect/save refinements
+        
+        Should be called when transitioning out of plan mode to detect
+        and save any refinements made to the plan during chat.
+        
+        Returns:
+            True if plan was refined and saved, False otherwise
+        """
+        if not self.plan_mode_state:
+            return False
+        
+        try:
+            from llm_runner.plan_handler import detect_and_save_plan_refinement
+            
+            # Get full chat context
+            chat_content = self.history.get_context()
+            
+            # Detect and save refinements
+            was_refined = detect_and_save_plan_refinement(
+                self.plan_mode_state,
+                chat_content,
+                output_dir="."
+            )
+            
+            self.plan_mode_state = None
+            return was_refined
+        
+        except Exception as e:
+            print(f"Error exiting plan mode: {e}")
+            self.plan_mode_state = None
+            return False
     
     def _handle_build_command(self):
         """Handle /build command - switch to build mode
@@ -390,6 +451,9 @@ def interactive_chat_repl(config=None, model=None):
             command_result, output = chat.process_input(user_input)
             
             if command_result == "quit":
+                # Exit plan mode if active before quitting
+                if chat.plan_mode_state:
+                    chat.exit_plan_mode()
                 print("Goodbye!")
                 break
             elif command_result == "clear":
