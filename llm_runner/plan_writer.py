@@ -60,3 +60,37 @@ class PlanWriter:
         content += plan.to_markdown()
         
         return content
+    
+    def _create_backup(self, filepath):
+        """Create backup of existing file before modification
+        
+        Args:
+            filepath: Path to file to backup
+            
+        Returns:
+            Path to backup file, or None if original doesn't exist
+        """
+        if not os.path.exists(filepath):
+            return None
+        
+        try:
+            # Create backups directory if needed
+            backup_dir = os.path.join(os.path.dirname(filepath) or ".", "backups")
+            os.makedirs(backup_dir, exist_ok=True)
+            
+            # Generate backup filename with timestamp
+            base_name = os.path.basename(filepath)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_name = f"{base_name}.{timestamp}.backup"
+            backup_path = os.path.join(backup_dir, backup_name)
+            
+            # Copy file to backup
+            with open(filepath, "r") as f:
+                content = f.read()
+            
+            with open(backup_path, "w") as f:
+                f.write(content)
+            
+            return backup_path
+        except Exception:
+            return None
