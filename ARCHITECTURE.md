@@ -440,6 +440,88 @@ tests/
 └── test_llm_provider.py        # Provider interface
 ```
 
+## Streaming Output Architecture
+
+### Real-Time Token Streaming
+
+All LLM requests support streaming to display tokens as they arrive from the Ollama API:
+
+**Implementation Flow:**
+1. `llm.py` - `send_prompt_streaming()` async generator
+   - Uses httpx.AsyncClient.stream() for async HTTP streaming
+   - Polls Ollama API with `"stream": True` in payload
+   - Yields individual tokens via `aiter_lines()` and JSON parsing
+
+2. Chat Integration - `chat.py`
+   - Collects streamed tokens in real-time
+   - Appends to message buffer for display
+   - Updates token count for context tracking
+   - Stores complete message in history after stream completes
+
+3. Mode Handlers - `plan_handler.py`, `build_handler.py`, `delegate_handler.py`
+   - Process streamed output for long-running operations
+   - Display thinking model output incrementally
+   - Maintain history of all streamed tokens for full message recovery
+
+**Key Benefits:**
+- Thinking model outputs visible as they arrive (not just at completion)
+- Perceived latency reduced significantly
+- Large response output appears progressively vs all at once
+- Better user experience for long-running tasks
+
+**Stream Callback Support:**
+- Optional `on_chunk_callback` parameter for custom handling
+- Callbacks can be sync or async (auto-detected via `inspect.iscoroutinefunction()`)
+- Enables extensibility for custom formatting, logging, or side-effects
+
+## Timeout Enforcement Architecture
+
+### Asyncio-Based Timeout System
+
+Long-running tasks are protected by asyncio timeout enforcement to prevent indefinite hangs:
+
+**Implementation Details:**
+
+1. **Core Timeout Wrapper** - `async_executor.py`
+   - `async_with_timeout()` function wraps asyncio.wait_for()
+   - Raises `TimeoutError` when operation exceeds threshold
+   - Graceful cancellation of asyncio tasks with proper cleanup
+   - Works across all async operations (LLM calls, subprocesses, agent execution)
+
+2. **LLM Client Integration** - `llm.py`
+   - `send_prompt_async()` method supports timeout parameter
+   - `send_prompt_streaming()` respects timeout with token collection protection
+   - Non-async `send_prompt()` unchanged (backwards compatible)
+
+3. **Agent Limiter** - `agent_limiter.py`
+   - `apply_timeout()` method now enforces actual timeout (not just measurement)
+   - Per-agent timeout override capability via AsyncTaskRunner
+   - Default task_timeout: 30 seconds (configurable)
+
+4. **Executor Integration** - `executor.py`
+   - `run_command_tool()` uses async execution with timeout
+   - Subprocess cancellation via CancelledError handling
+   - Proper resource cleanup on timeout
+
+**Timeout Flow:**
+```
+Agent execution → async_executor.AsyncTaskRunner.run_with_timeout()
+                ↓
+        asyncio.wait_for(coro, timeout)
+                ↓
+        ┌──────────┴──────────┐
+        ↓                     ↓
+    Completes (ok)    TimeoutError (raises)
+        ↓                     ↓
+    Return result    Cleanup + exception
+```
+
+**Safety Guarantees:**
+- No task runs indefinitely past timeout threshold
+- Cleanup handlers execute (finally blocks, context managers)
+- CancelledError propagates for proper error reporting
+- Cascading timeouts for nested operations (inner timeout must be < outer)
+
 ## Performance Considerations
 
 - **Agent Spawning**: Lightweight - agents are objects, not processes

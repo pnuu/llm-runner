@@ -637,6 +637,75 @@ $ llm-runner
 
 Sessions allow you to pause and resume conversations across multiple sessions.
 
+## Streaming Output
+
+LLM responses are streamed in real-time, meaning you see tokens appear as they are generated:
+
+### What You'll Notice
+
+When you send a message, the assistant's response appears **progressively** rather than all at once:
+
+```
+User: /ask What are the top 3 programming languages to learn?
+
+AI:
+1. Python - Versatile,
+ easy to learn, wi...
+```
+
+Notice how tokens appear continuously as the model generates them. This is especially visible with:
+- **Longer responses** - You see output building up line by line
+- **Thinking models** (like deepseek-r1) - Reasoning is visible in `<think>` tags as it happens
+- **Slow models** - Instead of waiting silently, you see incremental progress
+
+### Perceived Latency
+
+Streaming makes responses *feel* much faster:
+- First tokens appear quickly (within 100-500ms)
+- Full response takes same time, but feels shorter due to progressive display
+- Thinking model output gives confidence that the model is working
+
+### Examples
+
+**Fast Response (stays on one line):**
+```
+> What is 2+2?
+> 2 + 2 = 4
+```
+
+**Longer Response (streams multiple lines):**
+```
+> Write a Python function to check if a number is prime
+> def is_prime(n):
+>     if n < 2:
+>         return False
+>     for i in range(2, int(n**0.5) + 1):
+>         if n % i == 0:
+>             return False
+>     return True
+```
+
+**Thinking Model Output (reasoning visible):**
+```
+> Explain quantum entanglement
+> <think>
+> The user is asking about quantum entanglement. I should explain...
+> * Correlation between particles
+> * Non-locality
+> * Bell's theorem
+> * Applications in quantum computing
+> </think>
+>
+> Quantum entanglement is a phenomenon where...
+```
+
+### Timeout Protection
+
+If a response takes longer than expected, there's a safety timeout:
+- Default: 30 seconds per request
+- If exceeded, the request is cancelled and you're notified
+- Prevents indefinite hangs from unresponsive models
+
 ## Troubleshooting
 
 ### "No models available"

@@ -16,6 +16,14 @@ A fully-featured CLI tool for autonomous task execution using local LLMs via Oll
   - Sequential and parallel execution
   - Sub-agent coordination with cycle detection
   - Safety limits (depth, concurrency, timeouts)
+- **Streaming Output**: Real-time token streaming for long-running operations
+  - Visible thinking model output as tokens arrive
+  - Reduces perceived latency
+  - Works seamlessly in all modes
+- **Timeout Enforcement**: Asyncio-based timeout protection
+  - Prevents tasks from running indefinitely
+  - Configurable per-task or global defaults
+  - Graceful cancellation and cleanup
 
 ## Installation
 
@@ -26,7 +34,7 @@ pip install -e .
 Requires:
 - Python 3.14+
 - Ollama running locally on localhost:11434
-- PyYAML, requests
+- PyYAML, requests, httpx, pytest-asyncio
 
 ## Quick Start
 
@@ -133,13 +141,14 @@ Decomposes task into sub-tasks and orchestrates multi-agent execution.
 ```
 llm-runner/
 ├── cli.py                 # Entry point and command routing
-├── chat.py               # Interactive REPL
-├── llm.py                # Ollama integration
+├── chat.py               # Interactive REPL with streaming support
+├── llm.py                # Ollama integration (async + streaming)
+├── async_executor.py     # Timeout enforcement and async task runner
 ├── config.py             # Configuration management
 ├── agent.py              # Agent base class
 ├── agent_manager.py      # Lifecycle and cycle detection
 ├── agent_orchestrator.py # Multi-agent execution
-├── agent_limiter.py      # Safety enforcement
+├── agent_limiter.py      # Safety enforcement (with timeout)
 ├── handlers/             # Mode-specific logic
 │   ├── plan_handler.py
 │   ├── build_handler.py
@@ -219,6 +228,38 @@ This project uses test-driven development (TDD):
 4. Refactor if needed
 
 Commit only after a feature is completely implemented and tested (not for every small change).
+
+## Streaming and Timeout Configuration
+
+### Streaming Output
+
+All LLM requests support real-time streaming output. When streaming is enabled:
+- Tokens appear in the chat as they arrive from Ollama
+- Thinking model outputs become visible instead of appearing only at completion
+- Perceived latency is reduced significantly
+
+Streaming is enabled by default and works automatically in all modes (chat, plan, build, ask).
+
+### Timeout Enforcement
+
+Long-running tasks are protected by asyncio-based timeout enforcement:
+- Default task timeout: 30 seconds (configurable per agent/limiter)
+- Prevents indefinite hangs from unresponsive LLMs or commands
+- Tasks are gracefully cancelled with proper cleanup
+- Timeout errors are reported clearly to the user
+
+To customize timeout behavior, set the `task_timeout` parameter when creating an agent or limiter:
+
+```python
+from llm_runner.agent import Agent
+from llm_runner.agent_limiter import AgentLimiter
+
+# Per-agent timeout
+agent = Agent(model="mistral", task_timeout=60)
+
+# Per-limiter timeout (affects all agents it manages)
+limiter = AgentLimiter(task_timeout=120, max_concurrent=3)
+```
 
 ## Future Phases
 
