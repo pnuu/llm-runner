@@ -1,5 +1,15 @@
 """LLM integration module for Ollama"""
 import requests
+import asyncio
+import json
+from typing import Optional, Callable, AsyncIterator, Any
+try:
+    import httpx
+    HAS_HTTPX = True
+except ImportError:
+    HAS_HTTPX = False
+
+from llm_runner.async_executor import TimeoutError as AsyncTimeoutError
 
 
 class OllamaClient:
@@ -50,6 +60,114 @@ class OllamaClient:
             return f"[Error: Connection failed: {str(e)}]"
         except Exception as e:
             return f"[Error: {str(e)}]"
+    
+    async def send_prompt_async(
+        self,
+        prompt: str,
+        model: str = "mistral",
+        temperature: float = 0.7,
+        timeout_sec: Optional[float] = None
+    ) -> str:
+        """Send a prompt to Ollama asynchronously with timeout support
+        
+        Args:
+            prompt: User prompt text
+            model: Model name to use
+            temperature: Temperature parameter for response generation
+            timeout_sec: Timeout in seconds (uses asyncio default if None)
+            
+        Returns:
+            Response text from the model, or error message if failed
+        """
+        if not HAS_HTTPX:
+            return "[Error: httpx required for async operations. Install with: pip install httpx]"
+        
+        endpoint = f"{self.url}/api/generate"
+        
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "temperature": temperature,
+            "stream": False
+        }
+        
+        timeout = timeout_sec if timeout_sec is not None else 120.0
+        
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(endpoint, json=payload)
+                result = response.json()
+                
+                if "error" in result:
+                    error_msg = result.get("error", "Unknown error")
+                    return f"[Error from model: {error_msg}]"
+                
+                return result.get("response", "[No response from model]")
+        except asyncio.TimeoutError:
+            return "[Error: Request timed out (async). Model may be slow or unavailable.]"
+        except httpx.TimeoutException:
+            return "[Error: Request timed out (httpx). Model may be slow or unavailable.]"
+        except Exception as e:
+            return f"[Error: {str(e)}]"
+    
+    async def send_prompt_streaming(
+        self,
+        prompt: str,
+        model: str = "mistral",
+        temperature: float = 0.7,
+        on_chunk_callback: Optional[Callable[[dict], Any]] = None
+    ) -> AsyncIterator[dict]:
+        """Send a prompt to Ollama and stream the response
+        
+        Args:
+            prompt: User prompt text
+            model: Model name to use
+            temperature: Temperature parameter for response generation
+            on_chunk_callback: Optional callback function called for each chunk
+            
+        Yields:
+            Response chunks as dicts with "response" field
+        """
+        if not HAS_HTTPX:
+            yield {"error": "httpx required for streaming. Install with: pip install httpx"}
+            return
+        
+        endpoint = f"{self.url}/api/generate"
+        
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "temperature": temperature,
+            "stream": True
+        }
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                async with client.stream("POST", endpoint, json=payload) as response:
+                    async for line in response.aiter_lines():
+                        if line:
+                            try:
+                                chunk = json.loads(line)
+                                if on_chunk_callback:
+                                    await self._call_callback(on_chunk_callback, chunk)
+                                yield chunk
+                            except json.JSONDecodeError:
+                                # Skip malformed JSON lines
+                                continue
+        except Exception as e:
+            yield {"error": str(e)}
+    
+    async def _call_callback(self, callback: Callable, chunk: dict) -> None:
+        """Call callback, handling both sync and async callbacks
+        
+        Args:
+            callback: Function to call with chunk
+            chunk: Data to pass to callback
+        """
+        if asyncio.iscoroutinefunction(callback):
+            await callback(chunk)
+        else:
+            callback(chunk)
     
     def get_model_context_length(self, model_name):
         """Get context length (max tokens) for a model
