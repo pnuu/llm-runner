@@ -2,6 +2,7 @@
 import requests
 import asyncio
 import json
+import inspect
 from typing import Optional, Callable, AsyncIterator, Any
 try:
     import httpx
@@ -164,7 +165,7 @@ class OllamaClient:
             callback: Function to call with chunk
             chunk: Data to pass to callback
         """
-        if asyncio.iscoroutinefunction(callback):
+        if inspect.iscoroutinefunction(callback):
             await callback(chunk)
         else:
             callback(chunk)
