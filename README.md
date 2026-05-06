@@ -248,7 +248,23 @@ Long-running tasks are protected by asyncio-based timeout enforcement:
 - Tasks are gracefully cancelled with proper cleanup
 - Timeout errors are reported clearly to the user
 
-To customize timeout behavior, set the `task_timeout` parameter when creating an agent or limiter:
+**Disabling Timeout:**
+
+Timeout can be disabled at startup or toggled at runtime when needed for long-running operations:
+
+```bash
+# Start chat without timeout enforcement
+llm-runner --disable-timeout-check
+```
+
+In interactive mode, toggle timeout with:
+```
+/timeout off   # Disable timeout for long-running tasks
+/timeout on    # Re-enable timeout
+/timeout status # Show current timeout state
+```
+
+To customize timeout programmatically:
 
 ```python
 from llm_runner.agent import Agent

@@ -77,7 +77,7 @@ class ConversationHistory:
 class InteractiveChat:
     """Interactive chat session with Ollama"""
     
-    def __init__(self, ollama_url="http://localhost:11434", model="mistral", temperature=0.7, max_context_tokens=4096):
+    def __init__(self, ollama_url="http://localhost:11434", model="mistral", temperature=0.7, max_context_tokens=4096, timeout_enabled=True):
         """Initialize interactive chat
         
         Args:
@@ -85,6 +85,7 @@ class InteractiveChat:
             model: Model to use
             temperature: Temperature for responses
             max_context_tokens: Maximum tokens before compaction recommended
+            timeout_enabled: Whether to enforce timeouts (default True)
             
         Raises:
             Exception: If Ollama is not accessible
@@ -93,13 +94,14 @@ class InteractiveChat:
         if not check_ollama_connection(ollama_url):
             raise Exception(f"Cannot connect to Ollama at {ollama_url}")
         
-        self.client = OllamaClient(url=ollama_url)
+        self.client = OllamaClient(url=ollama_url, timeout_enabled=timeout_enabled)
         self.model = model
         self.temperature = temperature
         self.history = ConversationHistory(max_tokens=max_context_tokens)
         self.auto_compact_enabled = True
         self.auto_compact_threshold_percent = 90
         self.plan_mode_state = None  # Track state when in plan refinement mode
+        self.timeout_enabled = timeout_enabled
     
     def process_input(self, user_input):
         """Process user input, handling commands
@@ -132,6 +134,8 @@ class InteractiveChat:
                 return self._handle_build_command()
             elif command == "/ask":
                 return self._handle_ask_command()
+            elif command.startswith("/timeout"):
+                return self._handle_timeout_command(user_input)
             else:
                 # Unknown command
                 return ("unknown", None)
@@ -153,6 +157,10 @@ class InteractiveChat:
         display.append(f"Tokens: {info['token_count']} / {info['max_tokens']}")
         display.append(f"Bytes: {info['byte_count']:,}")
         display.append(f"Usage: {info['percent_of_max']}%")
+        display.append("")
+        display.append("=== Timeout ===")
+        timeout_state = "ENABLED" if self.timeout_enabled else "DISABLED"
+        display.append(f"Timeout enforcement: {timeout_state}")
         
         if compaction["should_compact"]:
             display.append("")
@@ -368,14 +376,45 @@ The following is the current plan file being refined:
             return ("ask_command", "Ask command cancelled.")
         except Exception as e:
             return ("ask_command", f"Error in ask command: {e}")
+    
+    def _handle_timeout_command(self, user_input):
+        """Handle /timeout command - toggle timeout enforcement
+        
+        Args:
+            user_input: Raw user input (e.g., "/timeout off")
+            
+        Returns:
+            Tuple of (command_result, output)
+        """
+        parts = user_input.lower().strip().split()
+        
+        if len(parts) < 2:
+            return ("timeout", f"Usage: /timeout [on|off|status]. Current: {'Enabled' if self.timeout_enabled else 'Disabled'}")
+        
+        subcommand = parts[1].lower()
+        
+        if subcommand == "on":
+            self.timeout_enabled = True
+            self.client.timeout_enabled = True
+            return ("timeout", "Timeout enforcement is now ENABLED.")
+        elif subcommand == "off":
+            self.timeout_enabled = False
+            self.client.timeout_enabled = False
+            return ("timeout", "Timeout enforcement is now DISABLED.")
+        elif subcommand == "status":
+            status = "ENABLED" if self.timeout_enabled else "DISABLED"
+            return ("timeout", f"Timeout enforcement is currently {status}.")
+        else:
+            return ("timeout", f"Unknown timeout subcommand '{subcommand}'. Use: on, off, or status.")
 
 
-def interactive_chat_repl(config=None, model=None):
+def interactive_chat_repl(config=None, model=None, disable_timeout=False):
     """Run interactive REPL chat
     
     Args:
         config: Configuration dictionary
         model: Optional model override
+        disable_timeout: If True, disable timeout enforcement
     """
     if config is None:
         from llm_runner.config import load_config
@@ -399,7 +438,8 @@ def interactive_chat_repl(config=None, model=None):
             ollama_url=config.get("ollama_url", "http://localhost:11434"),
             model=config.get("model", "mistral"),
             temperature=config.get("temperature", 0.7),
-            max_context_tokens=max_context_tokens
+            max_context_tokens=max_context_tokens,
+            timeout_enabled=not disable_timeout
         )
     except Exception as e:
         print(f"Error: {e}")

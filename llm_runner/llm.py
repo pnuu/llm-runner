@@ -16,13 +16,15 @@ from llm_runner.async_executor import TimeoutError as AsyncTimeoutError
 class OllamaClient:
     """Client for communicating with Ollama LLM API"""
     
-    def __init__(self, url="http://localhost:11434"):
+    def __init__(self, url="http://localhost:11434", timeout_enabled=True):
         """Initialize Ollama client
         
         Args:
             url: Ollama API endpoint URL
+            timeout_enabled: Whether to enforce timeout for requests (default True)
         """
         self.url = url
+        self.timeout_enabled = timeout_enabled
         self._context_length_cache = {}
     
     def send_prompt(self, prompt, model="mistral", temperature=0.7):
@@ -92,7 +94,11 @@ class OllamaClient:
             "stream": False
         }
         
-        timeout = timeout_sec if timeout_sec is not None else 120.0
+        # If timeout is disabled, use a very large timeout (no practical limit)
+        if not self.timeout_enabled:
+            timeout = 86400.0  # 24 hours effectively means no timeout
+        else:
+            timeout = timeout_sec if timeout_sec is not None else 120.0
         
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
@@ -143,7 +149,13 @@ class OllamaClient:
         }
         
         try:
-            async with httpx.AsyncClient() as client:
+            # If timeout is disabled, use a very large timeout (no practical limit)
+            if not self.timeout_enabled:
+                timeout = httpx.Timeout(86400.0)  # 24 hours effectively means no timeout
+            else:
+                timeout = httpx.Timeout(120.0)  # Default 120 seconds
+            
+            async with httpx.AsyncClient(timeout=timeout) as client:
                 async with client.stream("POST", endpoint, json=payload) as response:
                     async for line in response.aiter_lines():
                         if line:

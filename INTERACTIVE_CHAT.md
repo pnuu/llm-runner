@@ -27,7 +27,7 @@ Connected to Ollama at http://localhost:11434
 Available models: mistral:7b, llama3:8b, qwen:7b
 Using model: mistral:7b
 Commands: '/quit' (exit), '/clear' (history), '/context' (info), '/model' (select),
-          '/plan' (plan mode), '/build' (build mode), '/ask' (non-storing ask)
+          '/timeout' (toggle), '/plan' (plan mode), '/build' (build mode), '/ask' (non-storing ask)
 
 You: Hello! What's the weather today?
 Assistant: I don't have access to real-time weather data as I'm an offline AI. However, if you tell me your location...
@@ -228,6 +228,39 @@ Tokens: 1250 / 32768
 **When to Use `/ask`**:
 - Asking about implementation details without polluting main topic
 - Quick clarifications that don't need to persist
+
+### `/timeout` - Timeout Control
+
+Control timeout enforcement for long-running tasks.
+
+**Usage**:
+```
+You: /timeout status
+Timeout enforcement is currently ENABLED.
+
+You: /timeout off
+Timeout enforcement is now DISABLED.
+
+You: /timeout on
+Timeout enforcement is now ENABLED.
+```
+
+**When to Use**:
+- `/timeout off` - Disable timeouts for very long-running operations or thinking models
+- `/timeout on` - Re-enable timeouts after finishing long-running work
+- `/timeout status` - Check current timeout state (also shown in `/context`)
+
+**Via CLI**:
+Start chat without timeout enforcement:
+```bash
+llm-runner --disable-timeout-check
+```
+
+**Notes**:
+- Default: Timeouts are **enabled** (30 seconds per request) to prevent hanging
+- Disabling timeout allows truly unlimited execution time
+- Useful for: Complex reasoning, very large models, slow hardware
+- Re-enable when done to protect against accidental hangs
 - Exploring alternatives without committing to them
 - Testing ideas without affecting conversation flow
 
