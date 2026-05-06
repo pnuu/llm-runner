@@ -514,6 +514,9 @@ def interactive_chat_repl(config=None, model=None, disable_timeout=False):
             elif command_result == "ask_command":
                 print(f"\n{output}\n")
                 continue
+            elif command_result == "timeout":
+                print(f"\n{output}\n")
+                continue
             elif command_result == "unknown":
                 # Unknown command
                 continue
