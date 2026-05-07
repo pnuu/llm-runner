@@ -3,6 +3,14 @@ from pathlib import Path
 from typing import Optional, List
 from llm_runner.history_manager import HistoryManager
 
+try:
+    from prompt_toolkit import PromptSession
+    from prompt_toolkit.history import FileHistory
+    from prompt_toolkit.enums import EditingMode
+    HAS_PROMPT_TOOLKIT = True
+except ImportError:
+    HAS_PROMPT_TOOLKIT = False
+
 
 class CommandLineEditor:
     """Provides readline-style command line editing with up/down history navigation"""
@@ -125,3 +133,131 @@ class CommandLineEditor:
             List of all commands
         """
         return self.history.get_all()
+
+
+class PromptToolkitEditor:
+    """Advanced command line editor using prompt_toolkit with full readline support
+    
+    Features:
+    - Full cursor movement (left/right/home/end arrows)
+    - Multi-line support with proper wrapping
+    - History navigation from any cursor position
+    - Cross-platform (Windows, Linux, macOS)
+    - Auto-completion ready (future enhancement)
+    """
+    
+    def __init__(self, history_file: Optional[str] = None, max_history: int = 1000):
+        """Initialize editor with prompt_toolkit
+        
+        Args:
+            history_file: Path to history file (default: ~/.llm_runner/command_history)
+            max_history: Maximum history size
+        """
+        if not HAS_PROMPT_TOOLKIT:
+            raise ImportError(
+                "prompt_toolkit is required for advanced editing. "
+                "Install with: pip install prompt_toolkit>=3.0"
+            )
+        
+        if history_file is None:
+            history_file = str(Path.home() / ".llm_runner" / "command_history")
+        
+        # Ensure history directory exists
+        Path(history_file).parent.mkdir(parents=True, exist_ok=True)
+        
+        # Create FileHistory for prompt_toolkit
+        self.file_history = FileHistory(history_file)
+        
+        # Create session with history
+        self.session = PromptSession(
+            history=self.file_history,
+            editing_mode=EditingMode.EMACS,  # Supports readline-style editing
+            enable_history_search=True,
+        )
+        
+        # Keep compatibility with HistoryManager API
+        self.history = HistoryManager(history_file=history_file, max_size=max_history)
+    
+    def input(self, prompt: str = "") -> str:
+        """Get user input with full readline-style editing support
+        
+        Features:
+        - Arrow keys for cursor movement and history
+        - Home/End keys for line start/end
+        - Ctrl+A/E for start/end
+        - Multi-line wrapping support
+        - Full history navigation
+        
+        Args:
+            prompt: Prompt to display
+            
+        Returns:
+            User input line
+        """
+        try:
+            line = self.session.prompt(prompt)
+            if line.strip():
+                self.add_to_history(line)
+            return line
+        except (KeyboardInterrupt, EOFError):
+            raise
+    
+    def add_to_history(self, command: str) -> None:
+        """Add command to history
+        
+        Args:
+            command: Command to add
+        """
+        self.history.add(command)
+    
+    def start_navigation(self) -> None:
+        """Start navigating history (for API compatibility)"""
+        self.history.start_navigation()
+    
+    def end_navigation(self) -> None:
+        """End navigation mode (for API compatibility)"""
+        self.history.end_navigation()
+    
+    def search(self, pattern: str) -> List[str]:
+        """Search history by pattern
+        
+        Args:
+            pattern: Search pattern
+            
+        Returns:
+            List of matching commands
+        """
+        return self.history.search(pattern)
+    
+    def search_backward(self, pattern: str) -> Optional[str]:
+        """Search backward in history (most recent first)
+        
+        Args:
+            pattern: Search pattern
+            
+        Returns:
+            Most recent matching command or None
+        """
+        results = self.search(pattern)
+        return results[-1] if results else None
+    
+    def clear_history(self) -> None:
+        """Clear all history"""
+        self.history.clear()
+    
+    def history_count(self) -> int:
+        """Get number of commands in history
+        
+        Returns:
+            History size
+        """
+        return self.history.count()
+    
+    def get_history(self) -> List[str]:
+        """Get all history
+        
+        Returns:
+            List of all commands
+        """
+        return self.history.get_all()
+

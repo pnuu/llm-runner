@@ -3,6 +3,7 @@ from llm_runner.llm import OllamaClient, check_ollama_connection, get_available_
 from llm_runner.context_manager import ContextManager
 from llm_runner.ui_formatter import ChatUIFormatter
 from llm_runner.config import get_chat_colors
+from llm_runner.history_navigation import PromptToolkitEditor, HAS_PROMPT_TOOLKIT
 
 
 class ConversationHistory:
@@ -451,6 +452,17 @@ def interactive_chat_repl(config=None, model=None, disable_timeout=False):
     color_config = get_chat_colors(config)
     formatter = ChatUIFormatter(color_config)
     
+    # Initialize command line editor with advanced editing support
+    # Only use PromptToolkitEditor if in interactive terminal
+    import sys
+    editor = None
+    if sys.stdin.isatty() and HAS_PROMPT_TOOLKIT:
+        try:
+            editor = PromptToolkitEditor()
+        except Exception as e:
+            # Fallback if editor initialization fails
+            pass
+    
     # Show available models if default isn't found
     from llm_runner.llm import get_available_models
     available = get_available_models(url)
@@ -482,7 +494,16 @@ def interactive_chat_repl(config=None, model=None, disable_timeout=False):
             
             # Get user input with formatted prompt
             prompt = formatter.format_command_prompt()
-            user_input = input(prompt).strip()
+            
+            # Use editor if available, otherwise fall back to input()
+            if editor:
+                try:
+                    user_input = editor.input(prompt)
+                except KeyboardInterrupt:
+                    print("\nGoodbye!")
+                    break
+            else:
+                user_input = input(prompt).strip()
             
             if not user_input:
                 continue
